@@ -160,159 +160,281 @@
     .nav, .topbar, .dots, .actions { display: none; }
     body { background: #fff; color: #000; }
   }
+
+  .langs { display: flex; gap: 6px; }
+  .lang {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    width: 46px; height: 44px; border-radius: 12px; border: 2px solid var(--border);
+    background: var(--surface); cursor: pointer; padding: 0;
+  }
+  .lang svg { width: 28px; height: 18px; border-radius: 3px; border: 1px solid var(--border); display: block; }
+  .lang span { font-size: .62rem; font-weight: 800; letter-spacing: .5px; color: var(--text); line-height: 1; }
+  .lang.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .send { margin-top: 22px; padding-top: 16px; border-top: 2px solid var(--track); }
+  .send h3 { font-size: 1.05rem; }
+  .send .hint { margin-top: 6px; }
+  @media (max-width: 420px) { .topbar h1 { font-size: .78rem; } .lang { width: 42px; } .icon-btn { min-width: 40px; } }
 </style>
 </head>
 <body>
 <div id="app">
   <div class="topbar">
-    <h1>FEA-FBB · Kwestionariusz ADHD</h1>
-    <button class="icon-btn" id="theme" aria-label="Zmień motyw (jasny / ciemny)">◐</button>
+    <h1 id="apptitle"></h1>
+    <div class="langs" id="langs" role="group" aria-label="Language / Sprache / Język"></div>
+    <button class="icon-btn" id="theme">◐</button>
   </div>
   <div class="progress-text"><span id="ptext"></span><span id="pcount"></span></div>
-  <div class="bar" role="progressbar" aria-label="Postęp"><div id="pfill"></div></div>
+  <div class="bar" role="progressbar"><div id="pfill"></div></div>
   <div class="dots" id="dots"></div>
   <main id="view" aria-live="polite"></main>
   <div class="saved" id="saved"></div>
 </div>
 
 <div class="nav"><div class="nav-in">
-  <button class="btn" id="prev">← Wstecz</button>
-  <button class="btn primary" id="next">Dalej →</button>
+  <button class="btn" id="prev"></button>
+  <button class="btn primary" id="next"></button>
 </div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script>
+const LANGS = ['pl', 'de', 'en'];
+
 const SCALE = [
-  { v: 0, pl: 'wcale',               de: 'gar nicht' },
-  { v: 1, pl: 'trochę',              de: 'ein wenig' },
-  { v: 2, pl: 'w znacznym stopniu',  de: 'weitgehend' },
-  { v: 3, pl: 'szczególnie mocno',   de: 'besonders' },
+  { v: 0, pl: 'wcale',              de: 'gar nicht',  en: 'not at all' },
+  { v: 1, pl: 'trochę',             de: 'ein wenig',  en: 'a little' },
+  { v: 2, pl: 'w znacznym stopniu', de: 'weitgehend', en: 'considerably' },
+  { v: 3, pl: 'szczególnie mocno',  de: 'besonders',  en: 'especially' },
 ];
 
+// de = original wording of the FEA-FBB form (this is what goes into the PDF / e-mail)
 const QUESTIONS = [
-  { id:'q01', pl:'Często miał trudność ze zwracaniem uwagi na szczegóły lub z unikaniem błędów z nieuwagi, np. przy pracach szkolnych lub innych czynnościach.', de:'Es fiel ihr / ihm oft schwer, Einzelheiten zu beachten oder Flüchtigkeitsfehler zu vermeiden, z.B. bei Schularbeiten oder bei anderen Tätigkeiten.' },
-  { id:'q02', pl:'Często miał trudność z utrzymaniem koncentracji przy zadaniach lub podczas zabawy.', de:'Es fiel ihr / ihm oft schwer, sich bei Aufgaben oder beim Spiel dauerhaft zu konzentrieren.' },
-  { id:'q03', pl:'Często nie potrafił właściwie słuchać, gdy zwracano się do niego bezpośrednio.', de:'Sie / er konnte häufig nicht richtig zuhören, wenn sie / er direkt angesprochen wurde.' },
-  { id:'q04', pl:'Często miał trudność z pełnym wykonywaniem poleceń i z doprowadzaniem do końca prac szkolnych lub innych zadań.', de:'Sie / er hatte oft Schwierigkeiten, Aufträge von anderen vollständig durchzuführen und Schularbeiten oder andere Arbeiten zu Ende zu bringen.' },
-  { id:'q05', pl:'Często miał trudność z organizowaniem zadań lub czynności.', de:'Sie / er hatte oft Schwierigkeiten, Aufgaben oder Aktivitäten zu organisieren.' },
-  { id:'q06', pl:'Często unikał zadań wymagających dłuższej koncentracji i wysiłku albo wykonywał je tylko niechętnie.', de:'Sie / er hatte oft Aufgaben vermieden, bei denen sie / er sich länger konzentrieren und anstrengen musste oder sie / er hat sie nur widerwillig gemacht.' },
-  { id:'q07', pl:'Często gubił przedmioty potrzebne do zadań lub czynności (np. zabawki, zeszyty, klucze, książki).', de:'Sie / er hat oft Gegenstände verloren, die für bestimmte Aufgaben oder Aktivitäten nötig waren (z.B. Spielsachen, Hausaufgabenhefte, Schlüssel oder Bücher).' },
-  { id:'q08', pl:'Łatwo się rozpraszał.', de:'Sie / er war leicht ablenkbar.' },
-  { id:'q09', pl:'W codziennym życiu często bywał zapominalski.', de:'Sie / er war im Alltag häufig vergesslich.' },
-  { id:'q10', pl:'Jego ręce i stopy były ciągle w ruchu i nie potrafił spokojnie usiedzieć.', de:'Ihre / seine Hände und Füße waren ständig in Bewegung und sie / er konnte nicht ruhig sitzen bleiben.' },
-  { id:'q11', pl:'Często wstawał podczas lekcji lub w innych sytuacjach, w których było to nieodpowiednie.', de:'Sie / er stand oft im Unterricht oder in anderen Situationen auf, in denen es unpassend war.' },
-  { id:'q12', pl:'Miał trudność ze spokojną zabawą lub spokojnym spędzaniem czasu wolnego.', de:'Es fiel ihr / ihm schwer, ruhig zu spielen oder sich mit Freizeitaktivitäten ruhig zu beschäftigen.' },
-  { id:'q13', pl:'Często zrywał się i biegał dookoła, gdy było to nieodpowiednie.', de:'Sie / er ist häufig aufgesprungen und herumgelaufen, wenn es unpassend war.' },
-  { id:'q14', pl:'Często czuł się niespokojny i zdenerwowany.', de:'Sie / er fühlte sich oft unruhig und nervös.' },
-  { id:'q15', pl:'Był ciągle i w dużym stopniu w ruchu — i trudno było go w tym powstrzymać.', de:'Sie / er war ständig und in einem starken Ausmaß in Bewegung und konnte darin auch kaum durch andere begrenzt werden.' },
-  { id:'q16', pl:'Często był „ciągle na chodzie" (w nieustannym ruchu).', de:'Sie / er war häufig „auf Achse".' },
-  { id:'q17', pl:'Często wyrywał się z odpowiedzią, zanim pytanie zostało do końca zadane.', de:'Sie / er platzte häufig mit Antworten heraus, bevor Fragen zu Ende gestellt waren.' },
-  { id:'q18', pl:'Często z trudem czekał, aż przyjdzie jego kolej (np. w grach lub w grupie).', de:'Sie / er konnte häufig nur schwer warten, bis sie / er an der Reihe war (z.B. bei Spielen oder in einer Gruppe).' },
-  { id:'q19', pl:'Często przerywał lub przeszkadzał innym (np. podczas zabawy lub rozmowy).', de:'Sie / er unterbrach oder störte andere häufig (z.B. beim Spiel oder im Gespräch).' },
-  { id:'q20', pl:'Często mówił nadmiernie dużo.', de:'Sie / er redete häufig übermäßig viel.' },
-  { id:'a1', part:'A', pl:'Opisane problemy były wówczas dla niego ogółem bardzo obciążające.', de:'Die beschriebenen Probleme waren damals für sie / ihn insgesamt sehr belastend.' },
-  { id:'a2', part:'A', pl:'Opisane problemy znacząco pogarszały jego wyniki w szkole.', de:'Die beschriebenen Probleme beeinträchtigten damals ihre / seine Leistungsfähigkeit in der Schule erheblich.' },
-  { id:'a3', part:'A', pl:'Opisane problemy znacząco pogarszały jego relacje z nauczycielami.', de:'Die beschriebenen Probleme beeinträchtigten damals ihre / seine Beziehungen zu Lehrern erheblich.' },
-  { id:'a4', part:'A', pl:'Opisane problemy znacząco pogarszały jego relacje z rodzicami, przyjaciółmi lub kolegami z klasy.', de:'Die beschriebenen Probleme beeinträchtigten damals ihre / seine Beziehungen zu Eltern, Freunden oder Klassenkameraden erheblich.' },
-  { id:'a5', part:'A', pl:'Opisane problemy znacząco utrudniały mu czas wolny lub hobby.', de:'Die beschriebenen Probleme beeinträchtigten sie / ihn in der Freizeit oder bei ihren / seinen Hobbys erheblich.' },
+  { id:'q01', pl:'Często miał trudność ze zwracaniem uwagi na szczegóły lub z unikaniem błędów z nieuwagi, np. przy pracach szkolnych lub innych czynnościach.', en:'Often had difficulty paying attention to details or avoiding careless mistakes, e.g. in schoolwork or other activities.', de:'Es fiel ihr / ihm oft schwer, Einzelheiten zu beachten oder Flüchtigkeitsfehler zu vermeiden, z.B. bei Schularbeiten oder bei anderen Tätigkeiten.' },
+  { id:'q02', pl:'Często miał trudność z utrzymaniem koncentracji przy zadaniach lub podczas zabawy.', en:'Often had difficulty sustaining concentration on tasks or while playing.', de:'Es fiel ihr / ihm oft schwer, sich bei Aufgaben oder beim Spiel dauerhaft zu konzentrieren.' },
+  { id:'q03', pl:'Często nie potrafił właściwie słuchać, gdy zwracano się do niego bezpośrednio.', en:'Often could not listen properly when spoken to directly.', de:'Sie / er konnte häufig nicht richtig zuhören, wenn sie / er direkt angesprochen wurde.' },
+  { id:'q04', pl:'Często miał trudność z pełnym wykonywaniem poleceń i z doprowadzaniem do końca prac szkolnych lub innych zadań.', en:'Often had difficulty fully carrying out instructions from others and finishing schoolwork or other tasks.', de:'Sie / er hatte oft Schwierigkeiten, Aufträge von anderen vollständig durchzuführen und Schularbeiten oder andere Arbeiten zu Ende zu bringen.' },
+  { id:'q05', pl:'Często miał trudność z organizowaniem zadań lub czynności.', en:'Often had difficulty organizing tasks or activities.', de:'Sie / er hatte oft Schwierigkeiten, Aufgaben oder Aktivitäten zu organisieren.' },
+  { id:'q06', pl:'Często unikał zadań wymagających dłuższej koncentracji i wysiłku albo wykonywał je tylko niechętnie.', en:'Often avoided tasks that required sustained concentration and effort, or did them only reluctantly.', de:'Sie / er hatte oft Aufgaben vermieden, bei denen sie / er sich länger konzentrieren und anstrengen musste oder sie / er hat sie nur widerwillig gemacht.' },
+  { id:'q07', pl:'Często gubił przedmioty potrzebne do zadań lub czynności (np. zabawki, zeszyty, klucze, książki).', en:'Often lost things needed for tasks or activities (e.g. toys, homework notebooks, keys or books).', de:'Sie / er hat oft Gegenstände verloren, die für bestimmte Aufgaben oder Aktivitäten nötig waren (z.B. Spielsachen, Hausaufgabenhefte, Schlüssel oder Bücher).' },
+  { id:'q08', pl:'Łatwo się rozpraszał.', en:'Was easily distracted.', de:'Sie / er war leicht ablenkbar.' },
+  { id:'q09', pl:'W codziennym życiu często bywał zapominalski.', en:'Was often forgetful in daily life.', de:'Sie / er war im Alltag häufig vergesslich.' },
+  { id:'q10', pl:'Jego ręce i stopy były ciągle w ruchu i nie potrafił spokojnie usiedzieć.', en:'Hands and feet were constantly in motion and could not sit still.', de:'Ihre / seine Hände und Füße waren ständig in Bewegung und sie / er konnte nicht ruhig sitzen bleiben.' },
+  { id:'q11', pl:'Często wstawał podczas lekcji lub w innych sytuacjach, w których było to nieodpowiednie.', en:'Often got up during lessons or in other situations where it was inappropriate.', de:'Sie / er stand oft im Unterricht oder in anderen Situationen auf, in denen es unpassend war.' },
+  { id:'q12', pl:'Miał trudność ze spokojną zabawą lub spokojnym spędzaniem czasu wolnego.', en:'Had difficulty playing quietly or engaging in leisure activities quietly.', de:'Es fiel ihr / ihm schwer, ruhig zu spielen oder sich mit Freizeitaktivitäten ruhig zu beschäftigen.' },
+  { id:'q13', pl:'Często zrywał się i biegał dookoła, gdy było to nieodpowiednie.', en:'Often jumped up and ran around when it was inappropriate.', de:'Sie / er ist häufig aufgesprungen und herumgelaufen, wenn es unpassend war.' },
+  { id:'q14', pl:'Często czuł się niespokojny i zdenerwowany.', en:'Often felt restless and nervous.', de:'Sie / er fühlte sich oft unruhig und nervös.' },
+  { id:'q15', pl:'Był ciągle i w dużym stopniu w ruchu — i trudno było go w tym powstrzymać.', en:'Was constantly and to a great extent on the move, and others could hardly restrain this.', de:'Sie / er war ständig und in einem starken Ausmaß in Bewegung und konnte darin auch kaum durch andere begrenzt werden.' },
+  { id:'q16', pl:'Często był „ciągle na chodzie" (w nieustannym ruchu).', en:'Was often “on the go” (in constant motion).', de:'Sie / er war häufig „auf Achse".' },
+  { id:'q17', pl:'Często wyrywał się z odpowiedzią, zanim pytanie zostało do końca zadane.', en:'Often blurted out answers before questions had been finished.', de:'Sie / er platzte häufig mit Antworten heraus, bevor Fragen zu Ende gestellt waren.' },
+  { id:'q18', pl:'Często z trudem czekał, aż przyjdzie jego kolej (np. w grach lub w grupie).', en:'Often had difficulty waiting for their turn (e.g. in games or in a group).', de:'Sie / er konnte häufig nur schwer warten, bis sie / er an der Reihe war (z.B. bei Spielen oder in einer Gruppe).' },
+  { id:'q19', pl:'Często przerywał lub przeszkadzał innym (np. podczas zabawy lub rozmowy).', en:'Often interrupted or disturbed others (e.g. during games or conversation).', de:'Sie / er unterbrach oder störte andere häufig (z.B. beim Spiel oder im Gespräch).' },
+  { id:'q20', pl:'Często mówił nadmiernie dużo.', en:'Often talked excessively.', de:'Sie / er redete häufig übermäßig viel.' },
+  { id:'a1', part:'A', pl:'Opisane problemy były wówczas dla niego ogółem bardzo obciążające.', en:'The problems described were, overall, very distressing for them at the time.', de:'Die beschriebenen Probleme waren damals für sie / ihn insgesamt sehr belastend.' },
+  { id:'a2', part:'A', pl:'Opisane problemy znacząco pogarszały jego wyniki w szkole.', en:'The problems described considerably impaired their performance at school.', de:'Die beschriebenen Probleme beeinträchtigten damals ihre / seine Leistungsfähigkeit in der Schule erheblich.' },
+  { id:'a3', part:'A', pl:'Opisane problemy znacząco pogarszały jego relacje z nauczycielami.', en:'The problems described considerably impaired their relationships with teachers.', de:'Die beschriebenen Probleme beeinträchtigten damals ihre / seine Beziehungen zu Lehrern erheblich.' },
+  { id:'a4', part:'A', pl:'Opisane problemy znacząco pogarszały jego relacje z rodzicami, przyjaciółmi lub kolegami z klasy.', en:'The problems described considerably impaired their relationships with parents, friends or classmates.', de:'Die beschriebenen Probleme beeinträchtigten damals ihre / seine Beziehungen zu Eltern, Freunden oder Klassenkameraden erheblich.' },
+  { id:'a5', part:'A', pl:'Opisane problemy znacząco utrudniały mu czas wolny lub hobby.', en:'The problems described considerably impaired their leisure time or hobbies.', de:'Die beschriebenen Probleme beeinträchtigten sie / ihn in der Freizeit oder bei ihren / seinen Hobbys erheblich.' },
 ];
 const NQ = QUESTIONS.length;
+
+const UI = {
+  pl: {
+    appTitle: 'FEA-FBB · Kwestionariusz ADHD', theme: 'Zmień motyw (jasny / ciemny)', langLabel: 'Język',
+    stStart: 'Start', stQ: (n, t) => `Pytanie ${n} z ${t}`, stNotes: 'Uwagi', stSum: 'Podsumowanie',
+    answered: (a, t) => `Odpowiedzi: ${a} / ${t}`,
+    back: '← Wstecz', next: 'Dalej →', begin: 'Zaczynamy →', toStart: 'Do początku',
+    introTag: 'ADHD dla dorosłych · wcześniejsze problemy · ocena zewnętrzna', introH: 'Kwestionariusz FEA-FBB',
+    introP: 'Przy każdym opisie wskaż, jak bardzo pasował on do osoby ocenianej, gdy miała około <b>6–12 lat</b> (mniej więcej w okresie szkoły podstawowej).',
+    person: 'Imię i nazwisko osoby ocenianej', by: 'Wypełnił(a)', rel: 'Relacja do osoby ocenianej', relPick: '— wybierz —',
+    mother: 'Matka', father: 'Ojciec', date: 'Data wypełnienia',
+    introHint: 'Odpowiedzi zapisują się automatycznie tylko w tej przeglądarce na tym urządzeniu. Można wrócić w każdej chwili.',
+    tagDesc: 'Opis zachowania', tagFollow: 'Część końcowa — jak trafny był opis?',
+    keysHint: 'Skróty klawiszowe: 0–3 odpowiedź, ← → nawigacja',
+    notesH: 'Uwagi', notesHint: 'Cokolwiek, co pamiętasz i warto dodać. Lekarka dostanie ten tekst w oryginale — jeśli możesz, napisz po niemiecku.', notesPh: 'Wpisz tutaj…',
+    sumMissing: n => `Brakuje odpowiedzi: ${n}`, sumDone: 'Wszystko wypełnione ✓', sumHint: 'Dotknij wiersza, aby wrócić do pytania i zmienić odpowiedź.',
+    sendH: 'Wyślij do lekarki', sendNote: 'PDF i e-mail są po niemiecku: oryginalne pytania, odpowiedzi z niemieckimi nazwami.',
+    share: 'Udostępnij PDF (WhatsApp, e-mail…)', mail: 'Wyślij e-mailem (mailto)', pdf: 'Pobierz PDF',
+    mailNote: 'Mailto nie umie dołączyć pliku: w treści maila jest cały formularz po niemiecku, a PDF pobierze się, żeby go dołączyć ręcznie.',
+    reset: 'Usuń wszystkie odpowiedzi', resetConfirm: 'Na pewno usunąć wszystkie odpowiedzi?',
+    saved: '✓ Zapisano na tym urządzeniu', saveErr: 'Nie można zapisać w przeglądarce!',
+    pdfFail: 'Biblioteka PDF nie załadowała się (brak internetu?)',
+    shareUnsupported: 'Ta przeglądarka nie udostępnia plików — PDF został pobrany. Dołącz go do wiadomości ręcznie.',
+    dotAria: (n, a) => `Pytanie ${n}${a !== undefined ? ', odpowiedź ' + a : ', bez odpowiedzi'}`,
+  },
+  de: {
+    appTitle: 'FEA-FBB · ADHS-Fragebogen', theme: 'Design wechseln (hell / dunkel)', langLabel: 'Sprache',
+    stStart: 'Start', stQ: (n, t) => `Frage ${n} von ${t}`, stNotes: 'Bemerkungen', stSum: 'Zusammenfassung',
+    answered: (a, t) => `Antworten: ${a} / ${t}`,
+    back: '← Zurück', next: 'Weiter →', begin: 'Los geht’s →', toStart: 'Zum Anfang',
+    introTag: 'ADHS bei Erwachsenen · frühere Probleme · Fremdbeurteilung', introH: 'Fragebogen FEA-FBB',
+    introP: 'Kreuzen Sie für jede Beschreibung die Zahl an, die angibt, wie zutreffend sie für die beurteilte Person war, als diese etwa <b>sechs bis zwölf Jahre</b> alt war (etwa in der Grundschulzeit).',
+    person: 'Name der beurteilten Person', by: 'Ausgefüllt von', rel: 'Art der Beziehung zur beurteilten Person', relPick: '— bitte wählen —',
+    mother: 'Mutter', father: 'Vater', date: 'Datum',
+    introHint: 'Die Antworten werden automatisch nur in diesem Browser auf diesem Gerät gespeichert. Sie können jederzeit weitermachen.',
+    tagDesc: 'Beschreibung des Verhaltens', tagFollow: 'Abschließende Fragen: Wie zutreffend war die Beschreibung?',
+    keysHint: 'Tastatur: 0–3 antworten, ← → blättern',
+    notesH: 'Bemerkungen', notesHint: 'Alles, woran Sie sich erinnern und was wichtig sein könnte.', notesPh: 'Hier eintragen…',
+    sumMissing: n => `Es fehlen Antworten: ${n}`, sumDone: 'Alles ausgefüllt ✓', sumHint: 'Zeile antippen, um zur Frage zurückzukehren und die Antwort zu ändern.',
+    sendH: 'An die Ärztin senden', sendNote: 'PDF und E-Mail sind auf Deutsch: Originalfragen, Antworten mit deutscher Bezeichnung.',
+    share: 'PDF teilen (WhatsApp, E-Mail …)', mail: 'Per E-Mail senden (mailto)', pdf: 'PDF herunterladen',
+    mailNote: 'Mailto kann keine Datei anhängen: Der ganze Fragebogen steht im Text der E-Mail, das PDF wird zum manuellen Anhängen heruntergeladen.',
+    reset: 'Alle Antworten löschen', resetConfirm: 'Wirklich alle Antworten löschen?',
+    saved: '✓ Auf diesem Gerät gespeichert', saveErr: 'Speichern im Browser nicht möglich!',
+    pdfFail: 'PDF-Bibliothek nicht geladen (kein Internet?)',
+    shareUnsupported: 'Dieser Browser kann keine Dateien teilen – das PDF wurde heruntergeladen. Bitte manuell anhängen.',
+    dotAria: (n, a) => `Frage ${n}${a !== undefined ? ', Antwort ' + a : ', unbeantwortet'}`,
+  },
+  en: {
+    appTitle: 'FEA-FBB · ADHD questionnaire', theme: 'Switch theme (light / dark)', langLabel: 'Language',
+    stStart: 'Start', stQ: (n, t) => `Question ${n} of ${t}`, stNotes: 'Notes', stSum: 'Summary',
+    answered: (a, t) => `Answered: ${a} / ${t}`,
+    back: '← Back', next: 'Next →', begin: 'Let’s start →', toStart: 'Back to start',
+    introTag: 'Adult ADHD · past problems · rated by another person', introH: 'FEA-FBB questionnaire',
+    introP: 'For each description, mark how well it applied to the person being rated when they were about <b>6–12 years old</b> (roughly primary-school age).',
+    person: 'Name of the person being rated', by: 'Completed by', rel: 'Relationship to the person being rated', relPick: '— select —',
+    mother: 'Mother', father: 'Father', date: 'Date',
+    introHint: 'Answers are saved automatically, only in this browser on this device. You can come back at any time.',
+    tagDesc: 'Behaviour description', tagFollow: 'Final questions: how well did the description fit?',
+    keysHint: 'Keyboard: 0–3 answer, ← → navigate',
+    notesH: 'Notes', notesHint: 'Anything you remember that might be worth adding. The doctor receives this text as written, so German is best if you can.', notesPh: 'Type here…',
+    sumMissing: n => `Missing answers: ${n}`, sumDone: 'Everything answered ✓', sumHint: 'Tap a row to go back to that question and change the answer.',
+    sendH: 'Send to the doctor', sendNote: 'The PDF and e-mail are in German: original questions, answers with German labels.',
+    share: 'Share PDF (WhatsApp, e-mail…)', mail: 'Send by e-mail (mailto)', pdf: 'Download PDF',
+    mailNote: 'Mailto cannot attach a file: the whole form is in the e-mail text, and the PDF is downloaded so you can attach it manually.',
+    reset: 'Delete all answers', resetConfirm: 'Really delete all answers?',
+    saved: '✓ Saved on this device', saveErr: 'Cannot save in this browser!',
+    pdfFail: 'PDF library did not load (no internet?)',
+    shareUnsupported: 'This browser cannot share files — the PDF was downloaded. Please attach it manually.',
+    dotAria: (n, a) => `Question ${n}${a !== undefined ? ', answer ' + a : ', unanswered'}`,
+  },
+};
+
+const FLAGS = {
+  pl: '<svg viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="10" fill="#fff"/><rect y="10" width="30" height="10" fill="#dc143c"/></svg>',
+  de: '<svg viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="7" fill="#000"/><rect y="7" width="30" height="6.7" fill="#dd0000"/><rect y="13.4" width="30" height="6.6" fill="#ffce00"/></svg>',
+  en: '<svg viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#012169"/><path d="M0,0 L30,20 M30,0 L0,20" stroke="#fff" stroke-width="4"/><path d="M0,0 L30,20 M30,0 L0,20" stroke="#c8102e" stroke-width="1.6"/><path d="M15,0 V20 M0,10 H30" stroke="#fff" stroke-width="6"/><path d="M15,0 V20 M0,10 H30" stroke="#c8102e" stroke-width="3.4"/></svg>',
+};
+const LANG_NAMES = { pl: 'Polski', de: 'Deutsch', en: 'English' };
+
 // Steps: 0 = intro, 1..NQ = questions, NQ+1 = notes, NQ+2 = summary
 const STEP_NOTES = NQ + 1, STEP_SUM = NQ + 2, LAST = STEP_SUM;
 const KEY = 'fea-fbb-v1';
 
 const today = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
-let data = { step: 0, answers: {}, meta: { person: 'Rafal Sladek', date: today(), by: '', rel: '' }, notes: '' };
+const freshData = () => ({ step: 0, lang: 'pl', answers: {}, meta: { person: 'Rafal Sladek', date: today(), by: '', rel: '' }, notes: '' });
+let data = freshData();
+const T = () => UI[data.lang] || UI.pl;
 
 function load() {
-  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) data = { ...data, ...s, meta: { ...data.meta, ...s.meta } }; } catch (e) {}
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s) data = { ...data, ...s, meta: { ...data.meta, ...s.meta } };
+  } catch (e) {}
+  if (data.meta.rel === 'Matka') data.meta.rel = 'mother';
+  if (data.meta.rel === 'Ojciec') data.meta.rel = 'father';
+  if (!LANGS.includes(data.lang)) data.lang = 'pl';
 }
 let saveTimer;
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) { flash('Nie można zapisać w przeglądarce!'); return; }
-  flash('✓ Zapisano na tym urządzeniu');
+  try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) { flash(T().saveErr); return; }
+  flash(T().saved);
 }
 function flash(msg) {
-  const el = document.getElementById('saved'); el.textContent = msg;
-  clearTimeout(saveTimer); saveTimer = setTimeout(() => el.textContent = '', 1800);
+  const el = $('saved'); el.textContent = msg;
+  clearTimeout(saveTimer); saveTimer = setTimeout(() => el.textContent = '', 2600);
 }
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
 const answeredCount = () => QUESTIONS.filter(q => data.answers[q.id] !== undefined).length;
+const labelOf = (q, i) => q.part ? 'A' + q.id.slice(1) : String(i + 1);
+const relText = () => data.meta.rel ? T()[data.meta.rel] : '';
 
 function meter(v) { return `<span class="meter" aria-hidden="true">${[1,2,3].map(i => `<i class="${v >= i ? 'on' : ''}"></i>`).join('')}</span>`; }
+
+function renderChrome() {
+  document.documentElement.lang = data.lang;
+  const t = T();
+  $('apptitle').textContent = t.appTitle;
+  $('theme').setAttribute('aria-label', t.theme); $('theme').title = t.theme;
+  $('langs').innerHTML = LANGS.map(l => `<button class="lang ${l === data.lang ? 'on' : ''}" data-lang="${l}" aria-pressed="${l === data.lang}" aria-label="${LANG_NAMES[l]}" title="${LANG_NAMES[l]}">${FLAGS[l]}<span>${l.toUpperCase()}</span></button>`).join('');
+}
 
 function renderDots() {
   $('dots').innerHTML = QUESTIONS.map((q, i) => {
     const a = data.answers[q.id];
     const cls = (a !== undefined ? 'answered ' : '') + (data.step === i + 1 ? 'current' : '');
-    return `<button class="dot ${cls}" data-v="${a ?? ''}" data-go="${i + 1}" aria-label="Pytanie ${i + 1}${a !== undefined ? ', odpowiedź ' + a : ', bez odpowiedzi'}"></button>`;
+    return `<button class="dot ${cls}" data-v="${a ?? ''}" data-go="${i + 1}" aria-label="${T().dotAria(i + 1, a)}"></button>`;
   }).join('');
 }
 
 function render() {
-  const s = data.step, v = $('view');
-  $('pcount').textContent = `Odpowiedzi: ${answeredCount()} / ${NQ}`;
+  const s = data.step, v = $('view'), t = T(), L = data.lang;
+  renderChrome();
+  $('pcount').textContent = t.answered(answeredCount(), NQ);
   $('pfill').style.width = `${(answeredCount() / NQ) * 100}%`;
-  $('ptext').textContent = s === 0 ? 'Start' : s <= NQ ? `Pytanie ${s} z ${NQ}` : s === STEP_NOTES ? 'Uwagi' : 'Podsumowanie';
-  $('prev').disabled = s === 0;
-  $('next').textContent = s === LAST ? 'Do początku' : s === 0 ? 'Zaczynamy →' : 'Dalej →';
+  $('ptext').textContent = s === 0 ? t.stStart : s <= NQ ? t.stQ(s, NQ) : s === STEP_NOTES ? t.stNotes : t.stSum;
+  $('prev').textContent = t.back; $('prev').disabled = s === 0;
+  $('next').textContent = s === LAST ? t.toStart : s === 0 ? t.begin : t.next;
   $('next').disabled = s === LAST;
   renderDots();
 
   if (s === 0) {
     v.innerHTML = `<div class="card intro">
-      <div class="section-tag">ADHD dla dorosłych · wcześniejsze problemy · ocena zewnętrzna</div>
-      <h2 style="font-size:1.3rem">Kwestionariusz FEA-FBB</h2>
-      <p>Przy każdym opisie wskaż, jak bardzo pasował on do <b>Rafala</b>, gdy miał około <b>6–12 lat</b> (mniej więcej w okresie szkoły podstawowej).</p>
-      <ul class="legend">${SCALE.map(o => `<li><span class="sw" data-v="${o.v}">${o.v}</span><span><b>${o.pl}</b> <small style="color:var(--muted)">(${o.de})</small></span></li>`).join('')}</ul>
-      <label class="field"><span>Imię i nazwisko osoby ocenianej</span><input data-meta="person" value="${esc(data.meta.person)}" autocomplete="off"></label>
-      <label class="field"><span>Wypełnił(a)</span><input data-meta="by" value="${esc(data.meta.by)}" autocomplete="off"></label>
-      <label class="field"><span>Relacja do osoby ocenianej</span><select data-meta="rel"><option value="" ${data.meta.rel ? '' : 'selected'} disabled>— wybierz —</option>${['Matka','Ojciec'].map(r => `<option ${data.meta.rel === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
-      <label class="field"><span>Data wypełnienia</span><input type="date" data-meta="date" value="${esc(data.meta.date)}"></label>
-      <p class="hint">Odpowiedzi zapisują się automatycznie tylko w tej przeglądarce na tym urządzeniu. Można wrócić w każdej chwili.</p>
+      <div class="section-tag">${t.introTag}</div>
+      <h2 style="font-size:1.3rem">${t.introH}</h2>
+      <p>${t.introP}</p>
+      <ul class="legend">${SCALE.map(o => `<li><span class="sw" data-v="${o.v}">${o.v}</span><span><b>${o[L]}</b>${L !== 'de' ? ` <small style="color:var(--muted)">(${o.de})</small>` : ''}</span></li>`).join('')}</ul>
+      <label class="field"><span>${t.person}</span><input data-meta="person" value="${esc(data.meta.person)}" autocomplete="off"></label>
+      <label class="field"><span>${t.by}</span><input data-meta="by" value="${esc(data.meta.by)}" autocomplete="off"></label>
+      <label class="field"><span>${t.rel}</span><select data-meta="rel"><option value="" ${data.meta.rel ? '' : 'selected'} disabled>${t.relPick}</option>${['mother', 'father'].map(r => `<option value="${r}" ${data.meta.rel === r ? 'selected' : ''}>${t[r]}</option>`).join('')}</select></label>
+      <label class="field"><span>${t.date}</span><input type="date" data-meta="date" value="${esc(data.meta.date)}"></label>
+      <p class="hint">${t.introHint}</p>
     </div>`;
   } else if (s <= NQ) {
     const q = QUESTIONS[s - 1], cur = data.answers[q.id];
-    const isA = q.part === 'A';
     v.innerHTML = `<div class="card">
-      ${isA ? `<div class="section-tag">Część końcowa — jak trafny był opis?</div>` : `<div class="section-tag">Opis zachowania</div>`}
-      <div class="q-num">${isA ? 'A' + q.id.slice(1) : s}.</div>
-      <div class="q-pl">${esc(q.pl)}</div>
-      <div class="q-de">${esc(q.de)}</div>
-      <div class="options" role="radiogroup" aria-label="Odpowiedź">
+      <div class="section-tag">${q.part === 'A' ? t.tagFollow : t.tagDesc}</div>
+      <div class="q-num">${labelOf(q, s - 1)}.</div>
+      <div class="q-pl">${esc(q[L])}</div>
+      ${L !== 'de' ? `<div class="q-de" lang="de">${esc(q.de)}</div>` : ''}
+      <div class="options" role="radiogroup">
         ${SCALE.map(o => `<button class="opt ${cur === o.v ? 'selected' : ''}" data-v="${o.v}" role="radio" aria-checked="${cur === o.v}">
           <span class="num">${o.v}</span>
-          <span class="lbl"><b>${o.pl}</b><small>${o.de}</small></span>
+          <span class="lbl"><b>${o[L]}</b>${L !== 'de' ? `<small lang="de">${o.de}</small>` : ''}</span>
           ${meter(o.v)}<span class="check" aria-hidden="true"></span></button>`).join('')}
       </div>
-      <div class="scale-note">Skrót klawiszowy: 0–3 odpowiada, ← → nawigacja</div>
+      <div class="scale-note">${t.keysHint}</div>
     </div>`;
   } else if (s === STEP_NOTES) {
     v.innerHTML = `<div class="card">
       <div class="section-tag">Bemerkungen</div>
-      <h2 style="font-size:1.2rem">Uwagi</h2>
-      <p class="hint">Cokolwiek, co pamiętasz i warto dodać.</p>
-      <label class="field"><span class="sr" style="position:absolute;left:-9999px">Uwagi</span>
-        <textarea id="notes" placeholder="Wpisz tutaj…">${esc(data.notes)}</textarea></label>
+      <h2 style="font-size:1.2rem">${t.notesH}</h2>
+      <p class="hint">${t.notesHint}</p>
+      <label class="field"><span style="position:absolute;left:-9999px">${t.notesH}</span>
+        <textarea id="notes" placeholder="${t.notesPh}">${esc(data.notes)}</textarea></label>
     </div>`;
   } else {
     const rows = QUESTIONS.map((q, i) => {
       const a = data.answers[q.id];
-      return `<tr data-go="${i + 1}" class="${a === undefined ? 'missing' : ''}"><td class="n">${q.part ? 'A' + q.id.slice(1) : i + 1}</td><td>${esc(q.pl)}</td><td class="v"><div class="sw" data-v="${a ?? ''}">${a ?? '–'}</div></td></tr>`;
+      return `<tr data-go="${i + 1}" class="${a === undefined ? 'missing' : ''}"><td class="n">${q.part ? 'A' + q.id.slice(1) : i + 1}</td><td>${esc(q[L])}</td><td class="v"><div class="sw" data-v="${a ?? ''}">${a ?? '–'}</div></td></tr>`;
     }).join('');
     const missing = NQ - answeredCount();
     v.innerHTML = `<div class="card">
-      <div class="section-tag">Podsumowanie</div>
-      <h2 style="font-size:1.2rem">${missing ? `Brakuje odpowiedzi: ${missing}` : 'Wszystko wypełnione ✓'}</h2>
-      <p class="hint">Dotknij wiersza, aby wrócić do pytania i zmienić odpowiedź.</p>
+      <div class="section-tag">${t.stSum}</div>
+      <h2 style="font-size:1.2rem">${missing ? t.sumMissing(missing) : t.sumDone}</h2>
+      <p class="hint">${t.sumHint}</p>
       <table class="sum">${rows}</table>
-      <div class="actions">
-        <button class="btn primary" id="pdf">Pobierz PDF (jak oryginalny formularz)</button>
-        <button class="btn" id="copy">Kopiuj wyniki (tekst)</button>
-        <button class="btn danger" id="reset">Usuń wszystkie odpowiedzi</button>
+      <div class="send">
+        <h3>${t.sendH}</h3>
+        <p class="hint">${t.sendNote}</p>
+        <div class="actions">
+          <button class="btn primary" id="share">${t.share}</button>
+          <button class="btn" id="mail">${t.mail}</button>
+          <button class="btn" id="pdf">${t.pdf}</button>
+        </div>
+        <p class="hint">${t.mailNote}</p>
       </div>
+      <div class="actions"><button class="btn danger" id="reset">${t.reset}</button></div>
     </div>`;
   }
 }
@@ -330,6 +452,7 @@ function answer(val) {
 }
 
 // ==PDF-START==
+const REL_DE = { mother: 'Mutter', father: 'Vater' };
 const PL_MAP = { 'ą':'a','ć':'c','ę':'e','ł':'l','ń':'n','ó':'o','ś':'s','ź':'z','ż':'z','Ą':'A','Ć':'C','Ę':'E','Ł':'L','Ń':'N','Ó':'O','Ś':'S','Ź':'Z','Ż':'Z' };
 // jsPDF's built-in Helvetica only covers WinAnsi, so Polish letters in short fields are transliterated
 function pdfSafe(s) {
@@ -341,7 +464,7 @@ function buildPdf(jsPDF, d, questions, scale, notesImage) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const L = 15, R = 195, XC = 163, CW = 8, CX = i => XC + CW * i + CW / 2;
   const W = R - L, PAGE_MID = (L + R) / 2;
-  const name = pdfSafe(d.meta.person), by = pdfSafe(d.meta.by), rel = pdfSafe(d.meta.rel), date = pdfDate(d.meta.date);
+  const name = pdfSafe(d.meta.person), by = pdfSafe(d.meta.by), rel = pdfSafe(REL_DE[d.meta.rel] || ''), date = pdfDate(d.meta.date);
   doc.setDrawColor(0); doc.setTextColor(0); doc.setLineWidth(0.4);
   let y = 12;
 
@@ -457,36 +580,62 @@ function notesImage(str, wMm, maxHMm) {
   return { url: c.toDataURL('image/png'), w: wMm, h: c.height / k };
 }
 
-function downloadPdf() {
-  if (!window.jspdf) { flash('Biblioteka PDF nie załadowała się (brak internetu?)'); return; }
-  const doc = buildPdf(window.jspdf.jsPDF, data, QUESTIONS, SCALE, notesImage);
-  const nm = pdfSafe(data.meta.person).trim().replace(/\s+/g, '_') || 'Person';
-  doc.save(`FEA-FBB_${nm}.pdf`);
+// Everything that goes to the doctor is German, whatever the UI language is.
+function pdfName() { return `FEA-FBB_${pdfSafe(data.meta.person).trim().replace(/\s+/g, '_') || 'Person'}.pdf`; }
+function mailSubject() { return `FEA-FBB Fragebogen – ${pdfSafe(data.meta.person)}`; }
+function relDe() { return REL_DE[data.meta.rel] || ''; }
+function introDe() {
+  return `Sehr geehrte Damen und Herren,\n\nanbei der ausgefüllte ADHS-Fragebogen für Erwachsene, frühere Probleme, Fremdbeurteilung (FEA-FBB) für ${data.meta.person}.\nAusgefüllt von: ${data.meta.by}${relDe() ? ' (' + relDe() + ')' : ''}\nDatum: ${pdfDate(data.meta.date)}`;
+}
+function germanText() {
+  const lines = [introDe(), '', 'Skala: ' + SCALE.map(o => `${o.v} = ${o.de}`).join(', '), ''];
+  QUESTIONS.forEach((q, i) => {
+    const a = data.answers[q.id];
+    lines.push(`${q.part ? 'A' + q.id.slice(1) : String(i + 1).padStart(2, '0')}. ${q.de}`, `   Antwort: ${a === undefined ? '–' : a + ' (' + SCALE[a].de + ')'}`);
+  });
+  if (data.notes.trim()) lines.push('', 'Bemerkungen:', data.notes.trim());
+  lines.push('', 'Mit freundlichen Grüßen', data.meta.by);
+  return lines.join('\n');
 }
 
-function summaryText() {
-  const m = data.meta;
-  const lines = [`FEA-FBB — ${m.person}`, `Wypełnił(a): ${m.by}${m.rel ? ' (' + m.rel + ')' : ''}`, `Data: ${m.date}`, ''];
-  QUESTIONS.forEach((q, i) => lines.push(`${q.part ? 'A' + q.id.slice(1) : String(i + 1).padStart(2, '0')}: ${data.answers[q.id] ?? '-'}  ${SCALE[data.answers[q.id]]?.de ?? ''}`));
-  if (data.notes) lines.push('', 'Bemerkungen / Uwagi:', data.notes);
-  return lines.join('\n');
+function makePdf() {
+  if (!window.jspdf) { flash(T().pdfFail); return null; }
+  const doc = buildPdf(window.jspdf.jsPDF, data, QUESTIONS, SCALE, notesImage);
+  return { doc, file: new File([doc.output('blob')], pdfName(), { type: 'application/pdf' }) };
+}
+function downloadPdf() { const r = makePdf(); if (r) r.doc.save(pdfName()); }
+
+async function sharePdf() {
+  const r = makePdf(); if (!r) return;
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [r.file] })) {
+    try { await navigator.share({ files: [r.file], title: mailSubject(), text: introDe() }); }
+    catch (e) { if (e.name !== 'AbortError') { r.doc.save(pdfName()); flash(T().shareUnsupported); } }
+  } else { r.doc.save(pdfName()); flash(T().shareUnsupported); }
+}
+
+function mailPdf() {
+  downloadPdf();
+  const href = `mailto:?subject=${encodeURIComponent(mailSubject())}&body=${encodeURIComponent(germanText())}`;
+  setTimeout(() => { location.href = href; }, 400);
 }
 
 $('prev').onclick = () => go(data.step - 1);
 $('next').onclick = () => go(data.step + 1);
 $('dots').onclick = e => { const b = e.target.closest('[data-go]'); if (b) go(+b.dataset.go); };
+$('langs').onclick = e => {
+  const b = e.target.closest('[data-lang]'); if (!b) return;
+  data.lang = b.dataset.lang; save(); render();
+};
 
 $('view').addEventListener('click', e => {
   const opt = e.target.closest('.opt'); if (opt) return answer(+opt.dataset.v);
   const row = e.target.closest('tr[data-go]'); if (row) return go(+row.dataset.go);
-  if (e.target.id === 'copy') {
-    const t = summaryText();
-    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => flash('✓ Skopiowano'), () => { prompt('Skopiuj:', t); });
-  }
-  if (e.target.id === 'pdf') downloadPdf();
-  if (e.target.id === 'reset' && confirm('Na pewno usunąć wszystkie odpowiedzi?')) {
-    data = { step: 0, answers: {}, meta: { person: 'Rafal Sladek', date: today(), by: '', rel: '' }, notes: '' };
-    save(); render();
+  const id = e.target.id;
+  if (id === 'share') sharePdf();
+  if (id === 'mail') mailPdf();
+  if (id === 'pdf') downloadPdf();
+  if (id === 'reset' && confirm(T().resetConfirm)) {
+    const lang = data.lang; data = freshData(); data.lang = lang; save(); render();
   }
 });
 $('view').addEventListener('change', e => { if (e.target.tagName === 'SELECT') { data.meta[e.target.dataset.meta] = e.target.value; save(); } });
@@ -496,7 +645,7 @@ $('view').addEventListener('input', e => {
 });
 
 document.addEventListener('keydown', e => {
-  if (/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
   if (e.key >= '0' && e.key <= '3' && data.step >= 1 && data.step <= NQ) answer(+e.key);
   else if (e.key === 'ArrowRight') go(data.step + 1);
   else if (e.key === 'ArrowLeft') go(data.step - 1);
