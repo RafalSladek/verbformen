@@ -389,7 +389,7 @@ function render() {
       <div class="section-tag">${t.introTag}</div>
       <h2 style="font-size:1.3rem">${t.introH}</h2>
       <p>${t.introP}</p>
-      <ul class="legend">${SCALE.map(o => `<li><span class="sw" data-v="${o.v}">${o.v}</span><span><b>${o[L]}</b>${L !== 'de' ? ` <small style="color:var(--muted)">(${o.de})</small>` : ''}</span></li>`).join('')}</ul>
+      <ul class="legend">${SCALE.map(o => `<li><span class="sw" data-v="${o.v}">${o.v}</span><span><b>${o[L]}</b></span></li>`).join('')}</ul>
       <label class="field"><span>${t.person}</span><input data-meta="person" value="${esc(data.meta.person)}" autocomplete="off"></label>
       <label class="field"><span>${t.by}</span><input data-meta="by" value="${esc(data.meta.by)}" autocomplete="off"></label>
       <label class="field"><span>${t.rel}</span><select data-meta="rel"><option value="" ${data.meta.rel ? '' : 'selected'} disabled>${t.relPick}</option>${['mother', 'father'].map(r => `<option value="${r}" ${data.meta.rel === r ? 'selected' : ''}>${t[r]}</option>`).join('')}</select></label>
@@ -402,18 +402,16 @@ function render() {
       <div class="section-tag">${q.part === 'A' ? t.tagFollow : t.tagDesc}</div>
       <div class="q-num">${labelOf(q, s - 1)}.</div>
       <div class="q-pl">${esc(q[L])}</div>
-      ${L !== 'de' ? `<div class="q-de" lang="de">${esc(q.de)}</div>` : ''}
       <div class="options" role="radiogroup">
         ${SCALE.map(o => `<button class="opt ${cur === o.v ? 'selected' : ''}" data-v="${o.v}" role="radio" aria-checked="${cur === o.v}">
           <span class="num">${o.v}</span>
-          <span class="lbl"><b>${o[L]}</b>${L !== 'de' ? `<small lang="de">${o.de}</small>` : ''}</span>
+          <span class="lbl"><b>${o[L]}</b></span>
           ${meter(o.v)}<span class="check" aria-hidden="true"></span></button>`).join('')}
       </div>
       <div class="scale-note">${t.keysHint}</div>
     </div>`;
   } else if (s === STEP_NOTES) {
     v.innerHTML = `<div class="card">
-      <div class="section-tag">Bemerkungen</div>
       <h2 style="font-size:1.2rem">${t.notesH}</h2>
       <p class="hint">${t.notesHint}</p>
       <label class="field"><span style="position:absolute;left:-9999px">${t.notesH}</span>
