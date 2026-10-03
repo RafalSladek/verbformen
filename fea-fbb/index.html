@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="light dark">
+<title>Kwestionariusz FEA-FBB</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* Palette: one-hue blue ramp (differs in lightness, so it survives every type of
+     colour blindness) + orange accent (Okabe-Ito). Every option also carries a number,
+     a text label and a fill-level icon, so colour is never the only cue. */
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --text: #14213d;
+    --muted: #4b5563;
+    --border: #9aa5b5;
+    --accent: #d55e00;
+    --accent-text: #ffffff;
+    --focus: #d55e00;
+    --track: #d6dbe3;
+    --s0: #eaf2fb; --s0t: #14213d;
+    --s1: #a6cbe8; --s1t: #14213d;
+    --s2: #3d86c6; --s2t: #ffffff;
+    --s3: #0b2e5c; --s3t: #ffffff;
+    --shadow: 0 2px 10px rgba(20,33,61,.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1521; --surface: #182233; --text: #f1f5fb; --muted: #b4bfd0;
+      --border: #6f7f98; --accent: #f0a45a; --accent-text: #1a1206; --focus: #f0a45a; --track: #34425a;
+      --s0: #22324b; --s0t: #f1f5fb;
+      --s1: #3d6a99; --s1t: #ffffff;
+      --s2: #8fc0ee; --s2t: #0e1521;
+      --s3: #e3f0ff; --s3t: #0e1521;
+      --shadow: 0 2px 10px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1521; --surface: #182233; --text: #f1f5fb; --muted: #b4bfd0;
+    --border: #6f7f98; --accent: #f0a45a; --accent-text: #1a1206; --focus: #f0a45a; --track: #34425a;
+    --s0: #22324b; --s0t: #f1f5fb;
+    --s1: #3d6a99; --s1t: #ffffff;
+    --s2: #8fc0ee; --s2t: #0e1521;
+    --s3: #e3f0ff; --s3t: #0e1521;
+    --shadow: 0 2px 10px rgba(0,0,0,.5);
+  }
+
+  html { font-size: 18px; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100dvh; line-height: 1.45;
+    -webkit-text-size-adjust: 100%;
+  }
+  button, input, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+  #app { max-width: 640px; margin: 0 auto; padding: 14px 16px 120px; }
+
+  .topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .topbar h1 { font-size: .95rem; font-weight: 700; flex: 1; color: var(--muted); }
+  .icon-btn {
+    min-width: 44px; height: 44px; border-radius: 12px; border: 2px solid var(--border);
+    background: var(--surface); cursor: pointer; font-size: 1.05rem;
+  }
+
+  .progress-text { display: flex; justify-content: space-between; font-size: .85rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+  .bar { height: 10px; background: var(--track); border-radius: 6px; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--s3); width: 0; transition: width .25s; }
+  .dots { display: flex; gap: 3px; margin: 8px 0 18px; flex-wrap: wrap; }
+  .dot {
+    flex: 1 0 0; min-width: 8px; height: 22px; border-radius: 4px; border: 1px solid var(--border);
+    background: var(--surface); cursor: pointer; padding: 0;
+  }
+  .dot.answered { border-color: transparent; }
+  .dot.current { outline: 3px solid var(--accent); outline-offset: 1px; }
+  .dot[data-v="0"] { background: var(--s0); border: 1px solid var(--border); }
+  .dot[data-v="1"] { background: var(--s1); }
+  .dot[data-v="2"] { background: var(--s2); }
+  .dot[data-v="3"] { background: var(--s3); }
+
+  .card { background: var(--surface); border-radius: 18px; padding: 20px 18px; box-shadow: var(--shadow); border: 1px solid var(--track); }
+  .section-tag { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.4px; color: var(--accent); margin-bottom: 8px; }
+  .q-num { font-size: .9rem; font-weight: 700; color: var(--muted); }
+  .q-pl { font-size: 1.28rem; font-weight: 700; margin: 4px 0 10px; line-height: 1.35; }
+  .q-de { font-size: .88rem; color: var(--muted); font-style: italic; border-left: 3px solid var(--track); padding-left: 10px; }
+
+  .options { display: grid; gap: 10px; margin-top: 18px; }
+  .opt {
+    display: flex; align-items: center; gap: 14px; width: 100%; min-height: 64px; padding: 10px 14px;
+    border-radius: 14px; border: 3px solid transparent; cursor: pointer; text-align: left;
+    transition: transform .08s;
+  }
+  .opt:active { transform: scale(.985); }
+  .opt[data-v="0"] { background: var(--s0); color: var(--s0t); border-color: var(--border); }
+  .opt[data-v="1"] { background: var(--s1); color: var(--s1t); }
+  .opt[data-v="2"] { background: var(--s2); color: var(--s2t); }
+  .opt[data-v="3"] { background: var(--s3); color: var(--s3t); }
+  .opt .num { font-size: 1.7rem; font-weight: 800; width: 1.2em; text-align: center; }
+  .opt .lbl { flex: 1; line-height: 1.2; }
+  .opt .lbl b { display: block; font-size: 1.05rem; }
+  .opt .lbl small { font-size: .78rem; opacity: .85; }
+  .opt .meter { display: flex; gap: 3px; align-items: flex-end; height: 22px; }
+  .opt .meter i { width: 7px; border-radius: 2px; border: 2px solid currentColor; opacity: .55; }
+  .opt .meter i:nth-child(1) { height: 8px; } .opt .meter i:nth-child(2) { height: 13px; } .opt .meter i:nth-child(3) { height: 18px; }
+  .opt .meter i.on { background: currentColor; opacity: 1; }
+  .opt .check { width: 28px; height: 28px; border-radius: 50%; border: 3px solid currentColor; display: grid; place-items: center; font-weight: 900; flex: none; }
+  .opt.selected { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent); }
+  .opt.selected .check { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .opt:not(.selected) .check { opacity: .35; }
+  .opt:not(.selected) .check::after { content: ''; }
+  .opt.selected .check::after { content: '✓'; }
+
+  .scale-note { font-size: .8rem; color: var(--muted); margin-top: 14px; text-align: center; }
+
+  .field { display: block; margin-top: 14px; }
+  .field span { display: block; font-size: .85rem; font-weight: 700; margin-bottom: 4px; }
+  .field input, .field textarea, .field select {
+    width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 12px; background: var(--bg);
+  }
+  .field textarea { min-height: 160px; resize: vertical; }
+  .hint { font-size: .85rem; color: var(--muted); margin-top: 6px; }
+  .intro p { margin-top: 10px; }
+  .legend { list-style: none; margin-top: 12px; display: grid; gap: 6px; }
+  .legend li { display: flex; align-items: center; gap: 10px; font-size: .95rem; }
+  .legend .sw { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; font-weight: 800; border: 2px solid var(--border); flex: none; }
+  .sw[data-v="0"] { background: var(--s0); color: var(--s0t); } .sw[data-v="1"] { background: var(--s1); color: var(--s1t); }
+  .sw[data-v="2"] { background: var(--s2); color: var(--s2t); } .sw[data-v="3"] { background: var(--s3); color: var(--s3t); }
+
+  table.sum { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: .9rem; }
+  table.sum td { padding: 8px 4px; border-bottom: 1px solid var(--track); vertical-align: top; }
+  table.sum td.n { width: 2.4em; font-weight: 700; color: var(--muted); }
+  table.sum td.v { width: 46px; text-align: center; }
+  table.sum .sw { width: 34px; height: 34px; margin: 0 auto; }
+  table.sum tr { cursor: pointer; }
+  table.sum tr.missing .sw { background: transparent; color: var(--accent); border-style: dashed; }
+
+  .actions { display: grid; gap: 10px; margin-top: 18px; }
+  .btn {
+    min-height: 52px; border-radius: 14px; border: 2px solid var(--border); background: var(--surface);
+    font-weight: 700; cursor: pointer; padding: 0 16px;
+  }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .btn.danger { color: var(--accent); }
+
+  .nav {
+    position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--border);
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); box-shadow: 0 -4px 14px rgba(0,0,0,.08);
+  }
+  .nav-in { max-width: 640px; margin: 0 auto; display: flex; gap: 10px; }
+  .nav .btn { flex: 1; min-height: 54px; }
+  .nav .btn:disabled { opacity: .35; cursor: not-allowed; }
+  .saved { text-align: center; font-size: .75rem; color: var(--muted); margin-top: 6px; min-height: 1em; }
+
+  @media print {
+    .nav, .topbar, .dots, .actions { display: none; }
+    body { background: #fff; color: #000; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <h1>FEA-FBB · Kwestionariusz ADHD</h1>
+    <button class="icon-btn" id="theme" aria-label="Zmień motyw (jasny / ciemny)">◐</button>
+  </div>
+  <div class="progress-text"><span id="ptext"></span><span id="pcount"></span></div>
+  <div class="bar" role="progressbar" aria-label="Postęp"><div id="pfill"></div></div>
+  <div class="dots" id="dots"></div>
+  <main id="view" aria-live="polite"></main>
+  <div class="saved" id="saved"></div>
+</div>
+
+<div class="nav"><div class="nav-in">
+  <button class="btn" id="prev">← Wstecz</button>
+  <button class="btn primary" id="next">Dalej →</button>
+</div></div>
+
+<script>
+const SCALE = [
+  { v: 0, pl: 'wcale',               de: 'gar nicht' },
+  { v: 1, pl: 'trochę',              de: 'ein wenig' },
+  { v: 2, pl: 'w znacznym stopniu',  de: 'weitgehend' },
+  { v: 3, pl: 'szczególnie mocno',   de: 'besonders' },
+];
+
+const QUESTIONS = [
+  { id:'q01', pl:'Często miał trudność ze zwracaniem uwagi na szczegóły lub z unikaniem błędów z nieuwagi, np. przy pracach szkolnych lub innych czynnościach.', de:'Es fiel ihr / ihm oft schwer, Einzelheiten zu beachten oder Flüchtigkeitsfehler zu vermeiden, z.B. bei Schularbeiten oder bei anderen Tätigkeiten.' },
+  { id:'q02', pl:'Często miał trudność z utrzymaniem koncentracji przy zadaniach lub podczas zabawy.', de:'Es fiel ihr / ihm oft schwer, sich bei Aufgaben oder beim Spiel dauerhaft zu konzentrieren.' },
+  { id:'q03', pl:'Często nie potrafił właściwie słuchać, gdy zwracano się do niego bezpośrednio.', de:'Sie / er konnte häufig nicht richtig zuhören, wenn sie / er direkt angesprochen wurde.' },
+  { id:'q04', pl:'Często miał trudność z pełnym wykonywaniem poleceń i z doprowadzaniem do końca prac szkolnych lub innych zadań.', de:'Sie / er hatte oft Schwierigkeiten, Aufträge von anderen vollständig durchzuführen und Schularbeiten oder andere Arbeiten zu Ende zu bringen.' },
+  { id:'q05', pl:'Często miał trudność z organizowaniem zadań lub czynności.', de:'Sie / er hatte oft Schwierigkeiten, Aufgaben oder Aktivitäten zu organisieren.' },
+  { id:'q06', pl:'Często unikał zadań wymagających dłuższej koncentracji i wysiłku albo wykonywał je tylko niechętnie.', de:'Sie / er hatte oft Aufgaben vermieden, bei denen sie / er sich länger konzentrieren und anstrengen musste oder sie / er hat sie nur widerwillig gemacht.' },
+  { id:'q07', pl:'Często gubił przedmioty potrzebne do zadań lub czynności (np. zabawki, zeszyty, klucze, książki).', de:'Sie / er hat oft Gegenstände verloren, die für bestimmte Aufgaben oder Aktivitäten nötig waren (z.B. Spielsachen, Hausaufgabenhefte, Schlüssel oder Bücher).' },
+  { id:'q08', pl:'Łatwo się rozpraszał.', de:'Sie / er war leicht ablenkbar.' },
+  { id:'q09', pl:'W codziennym życiu często bywał zapominalski.', de:'Sie / er war im Alltag häufig vergesslich.' },
+  { id:'q10', pl:'Jego ręce i stopy były ciągle w ruchu i nie potrafił spokojnie usiedzieć.', de:'Ihre / seine Hände und Füße waren ständig in Bewegung und sie / er konnte nicht ruhig sitzen bleiben.' },
+  { id:'q11', pl:'Często wstawał podczas lekcji lub w innych sytuacjach, w których było to nieodpowiednie.', de:'Sie / er stand oft im Unterricht oder in anderen Situationen auf, in denen es unpassend war.' },
+  { id:'q12', pl:'Miał trudność ze spokojną zabawą lub spokojnym spędzaniem czasu wolnego.', de:'Es fiel ihr / ihm schwer, ruhig zu spielen oder sich mit Freizeitaktivitäten ruhig zu beschäftigen.' },
+  { id:'q13', pl:'Często zrywał się i biegał dookoła, gdy było to nieodpowiednie.', de:'Sie / er ist häufig aufgesprungen und herumgelaufen, wenn es unpassend war.' },
+  { id:'q14', pl:'Często czuł się niespokojny i zdenerwowany.', de:'Sie / er fühlte sich oft unruhig und nervös.' },
+  { id:'q15', pl:'Był ciągle i w dużym stopniu w ruchu — i trudno było go w tym powstrzymać.', de:'Sie / er war ständig und in einem starken Ausmaß in Bewegung und konnte darin auch kaum durch andere begrenzt werden.' },
+  { id:'q16', pl:'Często był „ciągle na chodzie" (w nieustannym ruchu).', de:'Sie / er war häufig „auf Achse".' },
+  { id:'q17', pl:'Często wyrywał się z odpowiedzią, zanim pytanie zostało do końca zadane.', de:'Sie / er platzte häufig mit Antworten heraus, bevor Fragen zu Ende gestellt waren.' },
+  { id:'q18', pl:'Często z trudem czekał, aż przyjdzie jego kolej (np. w grach lub w grupie).', de:'Sie / er konnte häufig nur schwer warten, bis sie / er an der Reihe war (z.B. bei Spielen oder in einer Gruppe).' },
+  { id:'q19', pl:'Często przerywał lub przeszkadzał innym (np. podczas zabawy lub rozmowy).', de:'Sie / er unterbrach oder störte andere häufig (z.B. beim Spiel oder im Gespräch).' },
+  { id:'q20', pl:'Często mówił nadmiernie dużo.', de:'Sie / er redete häufig übermäßig viel.' },
+  { id:'a1', part:'A', pl:'Opisane problemy były wówczas dla niego ogółem bardzo obciążające.', de:'Die beschriebenen Probleme waren damals für sie / ihn insgesamt sehr belastend.' },
+  { id:'a2', part:'A', pl:'Opisane problemy znacząco pogarszały jego wyniki w szkole.', de:'Die beschriebenen Probleme beeinträchtigten damals ihre / seine Leistungsfähigkeit in der Schule erheblich.' },
+  { id:'a3', part:'A', pl:'Opisane problemy znacząco pogarszały jego relacje z nauczycielami.', de:'Die beschriebenen Probleme beeinträchtigten damals ihre / seine Beziehungen zu Lehrern erheblich.' },
+  { id:'a4', part:'A', pl:'Opisane problemy znacząco pogarszały jego relacje z rodzicami, przyjaciółmi lub kolegami z klasy.', de:'Die beschriebenen Probleme beeinträchtigten damals ihre / seine Beziehungen zu Eltern, Freunden oder Klassenkameraden erheblich.' },
+  { id:'a5', part:'A', pl:'Opisane problemy znacząco utrudniały mu czas wolny lub hobby.', de:'Die beschriebenen Probleme beeinträchtigten sie / ihn in der Freizeit oder bei ihren / seinen Hobbys erheblich.' },
+];
+const NQ = QUESTIONS.length;
+// Steps: 0 = intro, 1..NQ = questions, NQ+1 = notes, NQ+2 = summary
+const STEP_NOTES = NQ + 1, STEP_SUM = NQ + 2, LAST = STEP_SUM;
+const KEY = 'fea-fbb-v1';
+
+let data = { step: 0, answers: {}, meta: { person: 'Rafal Sladek', date: '', by: '', rel: '' }, notes: '' };
+
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) data = { ...data, ...s, meta: { ...data.meta, ...s.meta } }; } catch (e) {}
+}
+let saveTimer;
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) { flash('Nie można zapisać w przeglądarce!'); return; }
+  flash('✓ Zapisano na tym urządzeniu');
+}
+function flash(msg) {
+  const el = document.getElementById('saved'); el.textContent = msg;
+  clearTimeout(saveTimer); saveTimer = setTimeout(() => el.textContent = '', 1800);
+}
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const answeredCount = () => QUESTIONS.filter(q => data.answers[q.id] !== undefined).length;
+
+function meter(v) { return `<span class="meter" aria-hidden="true">${[1,2,3].map(i => `<i class="${v >= i ? 'on' : ''}"></i>`).join('')}</span>`; }
+
+function renderDots() {
+  $('dots').innerHTML = QUESTIONS.map((q, i) => {
+    const a = data.answers[q.id];
+    const cls = (a !== undefined ? 'answered ' : '') + (data.step === i + 1 ? 'current' : '');
+    return `<button class="dot ${cls}" data-v="${a ?? ''}" data-go="${i + 1}" aria-label="Pytanie ${i + 1}${a !== undefined ? ', odpowiedź ' + a : ', bez odpowiedzi'}"></button>`;
+  }).join('');
+}
+
+function render() {
+  const s = data.step, v = $('view');
+  $('pcount').textContent = `Odpowiedzi: ${answeredCount()} / ${NQ}`;
+  $('pfill').style.width = `${(answeredCount() / NQ) * 100}%`;
+  $('ptext').textContent = s === 0 ? 'Start' : s <= NQ ? `Pytanie ${s} z ${NQ}` : s === STEP_NOTES ? 'Uwagi' : 'Podsumowanie';
+  $('prev').disabled = s === 0;
+  $('next').textContent = s === LAST ? 'Do początku' : s === 0 ? 'Zaczynamy →' : 'Dalej →';
+  $('next').disabled = s === LAST;
+  renderDots();
+
+  if (s === 0) {
+    v.innerHTML = `<div class="card intro">
+      <div class="section-tag">ADHD dla dorosłych · wcześniejsze problemy · ocena zewnętrzna</div>
+      <h2 style="font-size:1.3rem">Kwestionariusz FEA-FBB</h2>
+      <p>Przy każdym opisie wskaż, jak bardzo pasował on do <b>Rafala</b>, gdy miał około <b>6–12 lat</b> (mniej więcej w okresie szkoły podstawowej).</p>
+      <ul class="legend">${SCALE.map(o => `<li><span class="sw" data-v="${o.v}">${o.v}</span><span><b>${o.pl}</b> <small style="color:var(--muted)">(${o.de})</small></span></li>`).join('')}</ul>
+      <label class="field"><span>Imię i nazwisko osoby ocenianej</span><input data-meta="person" value="${esc(data.meta.person)}" autocomplete="off"></label>
+      <label class="field"><span>Wypełnił(a)</span><input data-meta="by" value="${esc(data.meta.by)}" autocomplete="off"></label>
+      <label class="field"><span>Relacja do osoby ocenianej</span><select data-meta="rel"><option value="" ${data.meta.rel ? '' : 'selected'} disabled>— wybierz —</option>${['Matka','Ojciec'].map(r => `<option ${data.meta.rel === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
+      <label class="field"><span>Data wypełnienia</span><input type="date" data-meta="date" value="${esc(data.meta.date)}"></label>
+      <p class="hint">Odpowiedzi zapisują się automatycznie tylko w tej przeglądarce na tym urządzeniu. Można wrócić w każdej chwili.</p>
+    </div>`;
+  } else if (s <= NQ) {
+    const q = QUESTIONS[s - 1], cur = data.answers[q.id];
+    const isA = q.part === 'A';
+    v.innerHTML = `<div class="card">
+      ${isA ? `<div class="section-tag">Część końcowa — jak trafny był opis?</div>` : `<div class="section-tag">Opis zachowania</div>`}
+      <div class="q-num">${isA ? 'A' + q.id.slice(1) : s}.</div>
+      <div class="q-pl">${esc(q.pl)}</div>
+      <div class="q-de">${esc(q.de)}</div>
+      <div class="options" role="radiogroup" aria-label="Odpowiedź">
+        ${SCALE.map(o => `<button class="opt ${cur === o.v ? 'selected' : ''}" data-v="${o.v}" role="radio" aria-checked="${cur === o.v}">
+          <span class="num">${o.v}</span>
+          <span class="lbl"><b>${o.pl}</b><small>${o.de}</small></span>
+          ${meter(o.v)}<span class="check" aria-hidden="true"></span></button>`).join('')}
+      </div>
+      <div class="scale-note">Skrót klawiszowy: 0–3 odpowiada, ← → nawigacja</div>
+    </div>`;
+  } else if (s === STEP_NOTES) {
+    v.innerHTML = `<div class="card">
+      <div class="section-tag">Bemerkungen</div>
+      <h2 style="font-size:1.2rem">Uwagi</h2>
+      <p class="hint">Cokolwiek, co pamiętasz i warto dodać.</p>
+      <label class="field"><span class="sr" style="position:absolute;left:-9999px">Uwagi</span>
+        <textarea id="notes" placeholder="Wpisz tutaj…">${esc(data.notes)}</textarea></label>
+    </div>`;
+  } else {
+    const rows = QUESTIONS.map((q, i) => {
+      const a = data.answers[q.id];
+      return `<tr data-go="${i + 1}" class="${a === undefined ? 'missing' : ''}"><td class="n">${q.part ? 'A' + q.id.slice(1) : i + 1}</td><td>${esc(q.pl)}</td><td class="v"><div class="sw" data-v="${a ?? ''}">${a ?? '–'}</div></td></tr>`;
+    }).join('');
+    const missing = NQ - answeredCount();
+    v.innerHTML = `<div class="card">
+      <div class="section-tag">Podsumowanie</div>
+      <h2 style="font-size:1.2rem">${missing ? `Brakuje odpowiedzi: ${missing}` : 'Wszystko wypełnione ✓'}</h2>
+      <p class="hint">Dotknij wiersza, aby wrócić do pytania i zmienić odpowiedź.</p>
+      <table class="sum">${rows}</table>
+      <div class="actions">
+        <button class="btn primary" id="copy">Kopiuj wyniki (tekst)</button>
+        <button class="btn" id="print">Drukuj / zapisz PDF</button>
+        <button class="btn danger" id="reset">Usuń wszystkie odpowiedzi</button>
+      </div>
+    </div>`;
+  }
+}
+
+function go(step) {
+  data.step = Math.max(0, Math.min(LAST, step));
+  save(); render(); window.scrollTo({ top: 0 });
+}
+
+function answer(val) {
+  const q = QUESTIONS[data.step - 1]; if (!q) return;
+  data.answers[q.id] = val; save(); render();
+  // brief pause so the selection is visible, then advance
+  setTimeout(() => { if (data.step === QUESTIONS.indexOf(q) + 1) go(data.step + 1); }, 280);
+}
+
+function summaryText() {
+  const m = data.meta;
+  const lines = [`FEA-FBB — ${m.person}`, `Wypełnił(a): ${m.by}${m.rel ? ' (' + m.rel + ')' : ''}`, `Data: ${m.date}`, ''];
+  QUESTIONS.forEach((q, i) => lines.push(`${q.part ? 'A' + q.id.slice(1) : String(i + 1).padStart(2, '0')}: ${data.answers[q.id] ?? '-'}  ${SCALE[data.answers[q.id]]?.de ?? ''}`));
+  if (data.notes) lines.push('', 'Bemerkungen / Uwagi:', data.notes);
+  return lines.join('\n');
+}
+
+$('prev').onclick = () => go(data.step - 1);
+$('next').onclick = () => go(data.step + 1);
+$('dots').onclick = e => { const b = e.target.closest('[data-go]'); if (b) go(+b.dataset.go); };
+
+$('view').addEventListener('click', e => {
+  const opt = e.target.closest('.opt'); if (opt) return answer(+opt.dataset.v);
+  const row = e.target.closest('tr[data-go]'); if (row) return go(+row.dataset.go);
+  if (e.target.id === 'copy') {
+    const t = summaryText();
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => flash('✓ Skopiowano'), () => { prompt('Skopiuj:', t); });
+  }
+  if (e.target.id === 'print') window.print();
+  if (e.target.id === 'reset' && confirm('Na pewno usunąć wszystkie odpowiedzi?')) {
+    data = { step: 0, answers: {}, meta: { person: 'Rafal Sladek', date: '', by: '', rel: '' }, notes: '' };
+    save(); render();
+  }
+});
+$('view').addEventListener('change', e => { if (e.target.tagName === 'SELECT') { data.meta[e.target.dataset.meta] = e.target.value; save(); } });
+$('view').addEventListener('input', e => {
+  if (e.target.dataset.meta) { data.meta[e.target.dataset.meta] = e.target.value; save(); }
+  if (e.target.id === 'notes') { data.notes = e.target.value; save(); }
+});
+
+document.addEventListener('keydown', e => {
+  if (/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if (e.key >= '0' && e.key <= '3' && data.step >= 1 && data.step <= NQ) answer(+e.key);
+  else if (e.key === 'ArrowRight') go(data.step + 1);
+  else if (e.key === 'ArrowLeft') go(data.step - 1);
+});
+
+// theme: follows system unless toggled
+$('theme').onclick = () => {
+  const dark = document.documentElement.dataset.theme === 'dark' ||
+    (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+  const next = dark ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('fea-fbb-theme', next); } catch (e) {}
+};
+try { const t = localStorage.getItem('fea-fbb-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+
+load(); render();
+</script>
+</body>
+</html>
