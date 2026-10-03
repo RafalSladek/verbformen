@@ -251,7 +251,7 @@ const UI = {
     keysHint: 'Skróty klawiszowe: 0–3 odpowiedź, ← → nawigacja',
     notesH: 'Uwagi', notesHint: 'Cokolwiek, co pamiętasz i warto dodać. Lekarka dostanie ten tekst w oryginale — jeśli możesz, napisz po niemiecku.', notesPh: 'Wpisz tutaj…',
     sumMissing: n => `Brakuje odpowiedzi: ${n}`, sumDone: 'Wszystko wypełnione ✓', sumHint: 'Dotknij wiersza, aby wrócić do pytania i zmienić odpowiedź.',
-    sendH: 'Wyślij do lekarki', sendNote: 'PDF i e-mail są po niemiecku: oryginalne pytania, odpowiedzi z niemieckimi nazwami.',
+    sendH: n => `Wyślij do: ${n}`, sendNote: 'PDF i e-mail są po niemiecku: oryginalne pytania, odpowiedzi z niemieckimi nazwami.',
     share: 'Udostępnij PDF (WhatsApp, e-mail…)', mail: 'Wyślij e-mailem (mailto)', pdf: 'Pobierz PDF',
     mailNote: 'Mailto nie umie dołączyć pliku: w treści maila jest cały formularz po niemiecku, a PDF pobierze się, żeby go dołączyć ręcznie.',
     reset: 'Usuń wszystkie odpowiedzi', resetConfirm: 'Na pewno usunąć wszystkie odpowiedzi?',
@@ -274,7 +274,7 @@ const UI = {
     keysHint: 'Tastatur: 0–3 antworten, ← → blättern',
     notesH: 'Bemerkungen', notesHint: 'Alles, woran Sie sich erinnern und was wichtig sein könnte.', notesPh: 'Hier eintragen…',
     sumMissing: n => `Es fehlen Antworten: ${n}`, sumDone: 'Alles ausgefüllt ✓', sumHint: 'Zeile antippen, um zur Frage zurückzukehren und die Antwort zu ändern.',
-    sendH: 'An die Ärztin senden', sendNote: 'PDF und E-Mail sind auf Deutsch: Originalfragen, Antworten mit deutscher Bezeichnung.',
+    sendH: n => `Senden an: ${n}`, sendNote: 'PDF und E-Mail sind auf Deutsch: Originalfragen, Antworten mit deutscher Bezeichnung.',
     share: 'PDF teilen (WhatsApp, E-Mail …)', mail: 'Per E-Mail senden (mailto)', pdf: 'PDF herunterladen',
     mailNote: 'Mailto kann keine Datei anhängen: Der ganze Fragebogen steht im Text der E-Mail, das PDF wird zum manuellen Anhängen heruntergeladen.',
     reset: 'Alle Antworten löschen', resetConfirm: 'Wirklich alle Antworten löschen?',
@@ -297,7 +297,7 @@ const UI = {
     keysHint: 'Keyboard: 0–3 answer, ← → navigate',
     notesH: 'Notes', notesHint: 'Anything you remember that might be worth adding. The doctor receives this text as written, so German is best if you can.', notesPh: 'Type here…',
     sumMissing: n => `Missing answers: ${n}`, sumDone: 'Everything answered ✓', sumHint: 'Tap a row to go back to that question and change the answer.',
-    sendH: 'Send to the doctor', sendNote: 'The PDF and e-mail are in German: original questions, answers with German labels.',
+    sendH: n => `Send to: ${n}`, sendNote: 'The PDF and e-mail are in German: original questions, answers with German labels.',
     share: 'Share PDF (WhatsApp, e-mail…)', mail: 'Send by e-mail (mailto)', pdf: 'Download PDF',
     mailNote: 'Mailto cannot attach a file: the whole form is in the e-mail text, and the PDF is downloaded so you can attach it manually.',
     reset: 'Delete all answers', resetConfirm: 'Really delete all answers?',
@@ -425,7 +425,7 @@ function render() {
       <p class="hint">${t.sumHint}</p>
       <table class="sum">${rows}</table>
       <div class="send">
-        <h3>${t.sendH}</h3>
+        <h3>${t.sendH(data.meta.person.trim().split(/\s+/)[0] || '…')}</h3>
         <p class="hint">${t.sendNote}</p>
         <div class="actions">
           <button class="btn primary" id="share">${t.share}</button>
