@@ -175,6 +175,7 @@
   .lang span { font-size: .62rem; font-weight: 800; letter-spacing: .5px; color: var(--text); line-height: 1; }
   .lang.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
   .send { margin-top: 22px; padding-top: 16px; border-top: 2px solid var(--track); }
+  .linkbtn { background: none; border: none; text-decoration: underline; font-weight: 700; cursor: pointer; color: var(--accent); padding: 4px; }
   .send h3 { font-size: 1.05rem; }
   .send .hint { margin-top: 6px; }
   @media (max-width: 420px) { .topbar h1 { font-size: .78rem; } .lang { width: 42px; } .icon-btn { min-width: 40px; } }
@@ -253,12 +254,13 @@ const UI = {
     introHint: 'Odpowiedzi zapisują się automatycznie tylko w tej przeglądarce na tym urządzeniu. Można wrócić w każdej chwili.',
     tagDesc: 'Opis zachowania', tagFollow: 'Część końcowa — jak trafny był opis?',
     keysHint: 'Skróty klawiszowe: 0–3 odpowiedź, ← → nawigacja',
-    notesH: 'Uwagi', notesHint: 'Cokolwiek, co pamiętasz i warto dodać.', notesPh: 'Wpisz tutaj…',
+    notesH: 'Uwagi', notesHint: 'Cokolwiek, co pamiętasz i warto dodać. Lekarka dostanie ten tekst w oryginale oraz w automatycznym tłumaczeniu na niemiecki (tekst uwag jest wysyłany do usługi tłumaczącej DeepL).', notesPh: 'Wpisz tutaj…',
     sumMissing: n => `Brakuje odpowiedzi: ${n}`, sumDone: 'Wszystko wypełnione ✓', sumHint: 'Dotknij wiersza, aby wrócić do pytania i zmienić odpowiedź.',
     sendH: n => `Wyślij do: ${n}`, sendNote: 'PDF i e-mail są po niemiecku: oryginalne pytania, odpowiedzi z niemieckimi nazwami.',
     share: 'Udostępnij PDF (WhatsApp, e-mail…)', mail: 'Wyślij e-mailem (mailto)', pdf: 'Pobierz PDF',
     mailNote: 'Mailto nie umie dołączyć pliku: w treści maila jest cały formularz po niemiecku, a PDF pobierze się, żeby go dołączyć ręcznie.',
     reset: 'Usuń wszystkie odpowiedzi', resetConfirm: 'Na pewno usunąć wszystkie odpowiedzi?',
+    trBusy: 'Tłumaczenie uwag na niemiecki…', trOk: '✓ Uwagi przetłumaczone na niemiecki', trFail: 'Nie udało się przetłumaczyć uwag — wysyłany jest tylko oryginał.', trRetry: 'Spróbuj ponownie',
     saved: '✓ Zapisano na tym urządzeniu', saveErr: 'Nie można zapisać w przeglądarce!',
     pdfFail: 'Biblioteka PDF nie załadowała się (brak internetu?)',
     shareUnsupported: 'Ta przeglądarka nie udostępnia plików — PDF został pobrany. Dołącz go do wiadomości ręcznie.',
@@ -282,6 +284,7 @@ const UI = {
     share: 'PDF teilen (WhatsApp, E-Mail …)', mail: 'Per E-Mail senden (mailto)', pdf: 'PDF herunterladen',
     mailNote: 'Mailto kann keine Datei anhängen: Der ganze Fragebogen steht im Text der E-Mail, das PDF wird zum manuellen Anhängen heruntergeladen.',
     reset: 'Alle Antworten löschen', resetConfirm: 'Wirklich alle Antworten löschen?',
+    trBusy: '', trOk: '', trFail: '', trRetry: '',
     saved: '✓ Auf diesem Gerät gespeichert', saveErr: 'Speichern im Browser nicht möglich!',
     pdfFail: 'PDF-Bibliothek nicht geladen (kein Internet?)',
     shareUnsupported: 'Dieser Browser kann keine Dateien teilen – das PDF wurde heruntergeladen. Bitte manuell anhängen.',
@@ -299,12 +302,13 @@ const UI = {
     introHint: 'Answers are saved automatically, only in this browser on this device. You can come back at any time.',
     tagDesc: 'Behaviour description', tagFollow: 'Final questions: how well did the description fit?',
     keysHint: 'Keyboard: 0–3 answer, ← → navigate',
-    notesH: 'Notes', notesHint: 'Anything you remember that might be worth adding.', notesPh: 'Type here…',
+    notesH: 'Notes', notesHint: 'Anything you remember that might be worth adding. The doctor receives this text as written and with an automatic German translation (the notes text is sent to the translation service DeepL).', notesPh: 'Type here…',
     sumMissing: n => `Missing answers: ${n}`, sumDone: 'Everything answered ✓', sumHint: 'Tap a row to go back to that question and change the answer.',
     sendH: n => `Send to: ${n}`, sendNote: 'The PDF and e-mail are in German: original questions, answers with German labels.',
     share: 'Share PDF (WhatsApp, e-mail…)', mail: 'Send by e-mail (mailto)', pdf: 'Download PDF',
     mailNote: 'Mailto cannot attach a file: the whole form is in the e-mail text, and the PDF is downloaded so you can attach it manually.',
     reset: 'Delete all answers', resetConfirm: 'Really delete all answers?',
+    trBusy: 'Translating notes into German…', trOk: '✓ Notes translated into German', trFail: 'Could not translate the notes — only the original is sent.', trRetry: 'Try again',
     saved: '✓ Saved on this device', saveErr: 'Cannot save in this browser!',
     pdfFail: 'PDF library did not load (no internet?)',
     shareUnsupported: 'This browser cannot share files — the PDF was downloaded. Please attach it manually.',
@@ -436,10 +440,12 @@ function render() {
           <button class="btn" id="mail">${t.mail}</button>
           <button class="btn" id="pdf">${t.pdf}</button>
         </div>
+        <p class="hint" id="trstatus" aria-live="polite"></p>
         <p class="hint">${t.mailNote}</p>
       </div>
       <div class="actions"><button class="btn danger" id="reset">${t.reset}</button></div>
     </div>`;
+    ensureTranslation();
   }
 }
 
@@ -547,9 +553,23 @@ function buildPdf(jsPDF, d, questions, scale, notesImage) {
   const nh = 95;
   vlines(y, y + nh);
   txt('Bemerkungen', (L + XC) / 2, y + 7, 9, { align: 'center' });
-  if (d.notes && d.notes.trim() && notesImage) {
-    const img = notesImage(d.notes.trim(), XC - L - 6, nh - 14);
-    if (img) doc.addImage(img.url, 'PNG', L + 3, y + 11, img.w, img.h);
+  const np = d.notesPack;
+  if (np && np.orig && notesImage) {
+    const bw = XC - L - 6;
+    if (np.de) {
+      doc.setTextColor(90); doc.setFontSize(7.5);
+      doc.text(`Original (${np.srcName}):`, L + 3, y + 12);
+      const img1 = notesImage(np.orig, bw, 36);
+      doc.addImage(img1.url, 'PNG', L + 3, y + 13.5, img1.w, img1.h);
+      const y2 = y + 13.5 + img1.h + 4;
+      doc.text('Übersetzung ins Deutsche (automatisch):', L + 3, y2);
+      const img2 = notesImage(np.de, bw, Math.max(10, nh - (y2 - y) - 6));
+      doc.addImage(img2.url, 'PNG', L + 3, y2 + 1.5, img2.w, img2.h);
+      doc.setTextColor(0);
+    } else {
+      const img = notesImage(np.orig, bw, nh - 14);
+      doc.addImage(img.url, 'PNG', L + 3, y + 11, img.w, img.h);
+    }
   }
   y += nh; hline(y);
   doc.setFillColor(255); doc.rect(PAGE_MID - 29, y - 3.7, 58, 7.5, 'FD');
@@ -597,14 +617,56 @@ function germanText() {
     const a = data.answers[q.id];
     lines.push(`${q.part ? 'A' + q.id.slice(1) : String(i + 1).padStart(2, '0')}. ${q.de}`, `   Antwort: ${a === undefined ? '–' : a + ' (' + SCALE[a].de + ')'}`);
   });
-  if (data.notes.trim()) lines.push('', 'Bemerkungen:', data.notes.trim());
+  const np = notesPack();
+  if (np.orig) {
+    if (np.de) lines.push('', `Bemerkungen (Original, ${np.srcName}):`, np.orig, '', 'Bemerkungen (automatische Übersetzung ins Deutsche):', np.de);
+    else lines.push('', 'Bemerkungen:', np.orig);
+  }
   lines.push('', 'Mit freundlichen Grüßen', data.meta.by);
   return lines.join('\n');
 }
 
+// ---- automatic German translation of the free-text notes (DeepL, via our own Cloudflare Worker proxy) ----
+const TRANSLATE_URL = 'https://fea-translate.rafal-sladek.workers.dev';
+const SRC_NAME = { pl: 'Polnisch', en: 'Englisch' };
+let trState = 'ok', trRun = 0;
+const notesKey = () => data.lang + '\n' + data.notes.trim();
+function notesPack() {
+  const orig = data.notes.trim();
+  const de = data.lang !== 'de' && orig && data.notesDe && data.notesDeKey === notesKey() ? data.notesDe : null;
+  return { orig, de, srcName: SRC_NAME[data.lang] || '' };
+}
+async function translateNotes(text, from) {
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const r = await fetch(TRANSLATE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, source: from }), signal: ctl.signal });
+    const j = await r.json();
+    if (!r.ok || typeof j.text !== 'string') throw new Error('translate');
+    return j.text;
+  } finally { clearTimeout(timer); }
+}
+function updateSendUi() {
+  const st = $('trstatus'); if (!st) return;
+  const t = T(), busy = trState === 'busy';
+  ['share', 'mail', 'pdf'].forEach(id => { const b = $(id); if (b) b.disabled = busy; });
+  st.innerHTML = trState === 'busy' ? esc(t.trBusy) : trState === 'fail' ? `${esc(t.trFail)} <button class="linkbtn" id="retr">${esc(t.trRetry)}</button>` : (notesPack().de ? esc(t.trOk) : '');
+}
+async function ensureTranslation() {
+  const orig = data.notes.trim();
+  if (!orig || data.lang === 'de' || notesPack().de) { trState = 'ok'; return updateSendUi(); }
+  const key = notesKey(), id = ++trRun; trState = 'busy'; updateSendUi();
+  try {
+    const text = await translateNotes(orig, data.lang);
+    if (id !== trRun) return;
+    data.notesDe = text; data.notesDeKey = key; trState = 'ok';
+    try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {}
+  } catch (e) { if (id !== trRun) return; trState = 'fail'; }
+  updateSendUi();
+}
+
 function makePdf() {
   if (!window.jspdf) { flash(T().pdfFail); return null; }
-  const doc = buildPdf(window.jspdf.jsPDF, data, QUESTIONS, SCALE, notesImage);
+  const doc = buildPdf(window.jspdf.jsPDF, { ...data, notesPack: notesPack() }, QUESTIONS, SCALE, notesImage);
   return { doc, file: new File([doc.output('blob')], pdfName(), { type: 'application/pdf' }) };
 }
 function downloadPdf() { const r = makePdf(); if (r) r.doc.save(pdfName()); }
@@ -637,6 +699,7 @@ $('view').addEventListener('click', e => {
   const id = e.target.id;
   if (id === 'share') sharePdf();
   if (id === 'mail') mailPdf();
+  if (id === 'retr') { data.notesDeKey = ''; ensureTranslation(); }
   if (id === 'pdf') downloadPdf();
   if (id === 'reset' && confirm(T().resetConfirm)) {
     const lang = data.lang; data = freshData(); data.lang = lang; save(); render();

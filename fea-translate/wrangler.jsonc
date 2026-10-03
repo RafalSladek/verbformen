@@ -1,0 +1,10 @@
+{
+  "name": "fea-translate",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://verbformen.rafal-sladek.com"
+  }
+}
