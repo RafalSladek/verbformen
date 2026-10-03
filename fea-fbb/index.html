@@ -180,6 +180,7 @@
   <button class="btn primary" id="next">Dalej →</button>
 </div></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script>
 const SCALE = [
   { v: 0, pl: 'wcale',               de: 'gar nicht' },
@@ -220,7 +221,8 @@ const NQ = QUESTIONS.length;
 const STEP_NOTES = NQ + 1, STEP_SUM = NQ + 2, LAST = STEP_SUM;
 const KEY = 'fea-fbb-v1';
 
-let data = { step: 0, answers: {}, meta: { person: 'Rafal Sladek', date: '', by: '', rel: '' }, notes: '' };
+const today = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
+let data = { step: 0, answers: {}, meta: { person: 'Rafal Sladek', date: today(), by: '', rel: '' }, notes: '' };
 
 function load() {
   try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) data = { ...data, ...s, meta: { ...data.meta, ...s.meta } }; } catch (e) {}
@@ -307,8 +309,8 @@ function render() {
       <p class="hint">Dotknij wiersza, aby wrócić do pytania i zmienić odpowiedź.</p>
       <table class="sum">${rows}</table>
       <div class="actions">
-        <button class="btn primary" id="copy">Kopiuj wyniki (tekst)</button>
-        <button class="btn" id="print">Drukuj / zapisz PDF</button>
+        <button class="btn primary" id="pdf">Pobierz PDF (jak oryginalny formularz)</button>
+        <button class="btn" id="copy">Kopiuj wyniki (tekst)</button>
         <button class="btn danger" id="reset">Usuń wszystkie odpowiedzi</button>
       </div>
     </div>`;
@@ -325,6 +327,141 @@ function answer(val) {
   data.answers[q.id] = val; save(); render();
   // brief pause so the selection is visible, then advance
   setTimeout(() => { if (data.step === QUESTIONS.indexOf(q) + 1) go(data.step + 1); }, 280);
+}
+
+// ==PDF-START==
+const PL_MAP = { 'ą':'a','ć':'c','ę':'e','ł':'l','ń':'n','ó':'o','ś':'s','ź':'z','ż':'z','Ą':'A','Ć':'C','Ę':'E','Ł':'L','Ń':'N','Ó':'O','Ś':'S','Ź':'Z','Ż':'Z' };
+// jsPDF's built-in Helvetica only covers WinAnsi, so Polish letters in short fields are transliterated
+function pdfSafe(s) {
+  return String(s || '').replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, c => PL_MAP[c]).replace(/[^\x20-\x7E -ÿ„“”‘’–—…]/g, '?');
+}
+function pdfDate(iso) { const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(iso || ''); return m ? `${m[3]}.${m[2]}.${m[1]}` : ''; }
+
+function buildPdf(jsPDF, d, questions, scale, notesImage) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const L = 15, R = 195, XC = 163, CW = 8, CX = i => XC + CW * i + CW / 2;
+  const W = R - L, PAGE_MID = (L + R) / 2;
+  const name = pdfSafe(d.meta.person), by = pdfSafe(d.meta.by), rel = pdfSafe(d.meta.rel), date = pdfDate(d.meta.date);
+  doc.setDrawColor(0); doc.setTextColor(0); doc.setLineWidth(0.4);
+  let y = 12;
+
+  const hline = (yy, x1 = L, x2 = R) => doc.line(x1, yy, x2, yy);
+  const vlines = (y1, y2) => { doc.line(L, y1, L, y2); doc.line(R, y1, R, y2); doc.line(XC, y1, XC, y2); };
+  const txt = (s, x, yy, size = 9, opts) => { doc.setFontSize(size); doc.text(s, x, yy, opts); };
+
+  // rotated scale labels above the answer columns
+  function scaleLabels(top, h) {
+    doc.setFontSize(6.5);
+    scale.forEach((o, i) => doc.text(o.de, CX(i) + 1.1, top + h - 1.5, { angle: 90 }));
+  }
+
+  function textBlock(s, x, yy, width, size, lh) {
+    doc.setFontSize(size);
+    doc.splitTextToSize(s, width).forEach((l, i) => doc.text(l, x, yy + i * lh));
+  }
+
+  function answerRow(label, text, ans) {
+    doc.setFontSize(8.5);
+    const lines = doc.splitTextToSize(`${label}. ${text}`, XC - L - 4);
+    const lh = 3.6, h = Math.max(8.5, lines.length * lh + 4);
+    vlines(y, y + h); hline(y + h);
+    const ty = y + (h - lines.length * lh) / 2 + 2.8;
+    lines.forEach((l, i) => doc.text(l, L + 2, ty + i * lh));
+    scale.forEach((o, i) => txt(String(o.v), CX(i), y + h / 2 + 1.3, 10, { align: 'center' }));
+    if (ans !== undefined) { doc.setLineWidth(0.5); doc.circle(CX(ans), y + h / 2, 2.6, 'S'); doc.setLineWidth(0.4); }
+    y += h;
+  }
+  const labelOf = (q, i) => q.part ? 'A' + q.id.slice(1) : String(i + 1).padStart(2, '0');
+  const rowOf = i => answerRow(labelOf(questions[i], i), questions[i].de, d.answers[questions[i].id]);
+
+  // ---------- page 1 ----------
+  doc.setFillColor(205); doc.rect(L, y, W, 14, 'FD'); doc.setFillColor(255);
+  txt('Anhang 6: ADHS-Fragebogen für Erwachsene', PAGE_MID, y + 5.8, 13, { align: 'center' });
+  txt('Frühere Probleme, Fremdbeurteilung (FEA-FBB)', PAGE_MID, y + 11.6, 13, { align: 'center' });
+  y += 14;
+
+  vlines(y, y + 18 + 17);
+  hline(y); hline(y + 9, L, XC); hline(y + 18, L, XC);
+  txt(`Name der beurteilten Person: ${name}`, L + 2, y + 6, 9);
+  txt('Alter:', 108, y + 6, 9); txt(`Datum: ${date}`, 128, y + 6, 9);
+  txt('Berufsausbildung:', L + 2, y + 15, 9); txt('Gegenwärtige Tätigkeit:', 85, y + 15, 9);
+  y += 18;
+  txt(`Ausgefüllt von: ${by}`, L + 2, y + 6, 9);
+  const relLabel = 'Art der Beziehung zur beurteilten Person (z.B. Vater, Mutter): ';
+  txt(relLabel, L + 2, y + 13, 9);
+  const relX = L + 3 + doc.getTextWidth(relLabel);
+  txt(rel, relX, y + 13, 10);
+  if (rel) { doc.setLineWidth(0.2); doc.line(relX, y + 13.8, Math.min(XC - 2, relX + 30), y + 13.8); doc.setLineWidth(0.4); }
+  y += 17;
+  hline(y, L, XC);
+  const instr = `Kreuzen Sie bitte für jede Beschreibung die Zahl an, die angibt, wie zutreffend diese Beschreibung für ${name || '____________________'} war, als die Person etwa sechs bis zwölf Jahre alt war (etwa in der Grundschulzeit)`;
+  vlines(y, y + 33);
+  textBlock(instr, L + 2, y + 6, XC - L - 5, 9, 4.6);
+  scaleLabels(y, 33);
+  y += 33; hline(y);
+
+  for (let i = 0; i < 18; i++) rowOf(i);
+  doc.setFillColor(255); doc.rect(PAGE_MID - 17, y + 3, 34, 7.5, 'S');
+  txt('Bitte wenden', PAGE_MID, y + 8, 9, { align: 'center' });
+
+  // ---------- page 2 ----------
+  doc.addPage(); y = 12; hline(y);
+  for (let i = 18; i < 20; i++) rowOf(i);
+
+  const sec = 'Beantworten Sie bitte abschließend noch folgende Fragen, wenn zumindest eines der auf der ersten Seite beschriebenen Verhaltensprobleme für die Person im Alter von sechs bis zwölf Jahren zutraf.';
+  vlines(y, y + 24);
+  textBlock(sec, L + 2, y + 6, XC - L - 5, 9.5, 4.8);
+  textBlock('Wie zutreffend war die Beschreibung?', XC + 1.5, y + 8, 29, 7.5, 3.6);
+  y += 24; hline(y);
+  vlines(y, y + 17); scaleLabels(y, 17); y += 17; hline(y);
+
+  for (let i = 20; i < questions.length; i++) rowOf(i);
+
+  const nh = 95;
+  vlines(y, y + nh);
+  txt('Bemerkungen', (L + XC) / 2, y + 7, 9, { align: 'center' });
+  if (d.notes && d.notes.trim() && notesImage) {
+    const img = notesImage(d.notes.trim(), XC - L - 6, nh - 14);
+    if (img) doc.addImage(img.url, 'PNG', L + 3, y + 11, img.w, img.h);
+  }
+  y += nh; hline(y);
+  doc.setFillColor(255); doc.rect(PAGE_MID - 29, y - 3.7, 58, 7.5, 'FD');
+  txt('Vielen Dank für Ihre Mitarbeit', PAGE_MID, y + 1.3, 9, { align: 'center' });
+
+  y += 12;
+  doc.setFillColor(228); doc.setLineWidth(0.2); doc.rect(L, y, W, 13, 'FD'); doc.setFillColor(255);
+  textBlock('ADHS-Fragebogen für Erwachsene auf der Basis von DSM-IV und ICD-10. © by M. Döpfner, G. Lehmkuhl & H.-C. Steinhausen, Köln und Zürich 2001. Publiziert in: Döpfner et al. (2005): Kinder-Diagnostik-System KIDS, Band 1 Aufmerksamkeitsdefizit- / Hyperaktivitätsstörungen. Göttingen: Hogrefe.', L + 2, y + 4.5, W - 4, 7.5, 3.6);
+  return doc;
+}
+// ==PDF-END==
+
+// Notes can contain Polish letters, so they are drawn on a canvas and embedded as an image
+function notesImage(str, wMm, maxHMm) {
+  const k = 8, fs = 3.6 * k, lh = 5 * k, W = Math.round(wMm * k);
+  const c = document.createElement('canvas'), x = c.getContext('2d');
+  const font = `${fs}px Arial, Helvetica, sans-serif`;
+  x.font = font;
+  const lines = [];
+  str.split('\n').forEach(par => {
+    let cur = '';
+    par.split(/\s+/).forEach(w => {
+      const t = cur ? cur + ' ' + w : w;
+      if (x.measureText(t).width > W && cur) { lines.push(cur); cur = w; } else cur = t;
+    });
+    lines.push(cur);
+  });
+  const use = lines.slice(0, Math.max(1, Math.floor(maxHMm * k / lh)));
+  c.width = W; c.height = use.length * lh + 8;
+  x.font = font; x.fillStyle = '#000'; x.textBaseline = 'top';
+  use.forEach((l, i) => x.fillText(l, 0, i * lh + 2));
+  return { url: c.toDataURL('image/png'), w: wMm, h: c.height / k };
+}
+
+function downloadPdf() {
+  if (!window.jspdf) { flash('Biblioteka PDF nie załadowała się (brak internetu?)'); return; }
+  const doc = buildPdf(window.jspdf.jsPDF, data, QUESTIONS, SCALE, notesImage);
+  const nm = pdfSafe(data.meta.person).trim().replace(/\s+/g, '_') || 'Person';
+  doc.save(`FEA-FBB_${nm}.pdf`);
 }
 
 function summaryText() {
@@ -346,9 +483,9 @@ $('view').addEventListener('click', e => {
     const t = summaryText();
     (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => flash('✓ Skopiowano'), () => { prompt('Skopiuj:', t); });
   }
-  if (e.target.id === 'print') window.print();
+  if (e.target.id === 'pdf') downloadPdf();
   if (e.target.id === 'reset' && confirm('Na pewno usunąć wszystkie odpowiedzi?')) {
-    data = { step: 0, answers: {}, meta: { person: 'Rafal Sladek', date: '', by: '', rel: '' }, notes: '' };
+    data = { step: 0, answers: {}, meta: { person: 'Rafal Sladek', date: today(), by: '', rel: '' }, notes: '' };
     save(); render();
   }
 });
