@@ -56,7 +56,10 @@
     min-height: 100dvh; line-height: 1.45;
     -webkit-text-size-adjust: 100%;
   }
-  button, input, textarea { font: inherit; color: inherit; }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
+  .field select option { color: var(--text); background: var(--surface); }
   :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
   #app { max-width: 640px; margin: 0 auto; padding: 14px 16px 120px; }
@@ -331,7 +334,9 @@ function load() {
   } catch (e) {}
   if (data.meta.rel === 'Matka') data.meta.rel = 'mother';
   if (data.meta.rel === 'Ojciec') data.meta.rel = 'father';
-  if (!LANGS.includes(data.lang)) data.lang = 'pl';
+  // every visit starts in Polish with today's date; changes made during the visit are still saved
+  data.lang = 'pl';
+  data.meta.date = today();
 }
 let saveTimer;
 function save() {
